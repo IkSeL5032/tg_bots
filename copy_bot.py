@@ -1,49 +1,51 @@
-import requests
-import time
+import logging
 
-token = '6150442279:AAF_Op6lsUnpXMzDWs6J5MRMBMXOEKXTIRU'
-BASE_URL = 'https://api.telegram.org/bot'
-def work():
-    file_id = ''
-    caption = ''
-    cnt_message = 0
-    while True:
-        time.sleep(0.5)
-        response = requests.get(f'{BASE_URL}{token}/getUpdates').json()
-        if cnt_message != len(response['result']):
-            cnt_message = len(response['result'])
-            message = response['result'][-1]['message']
-            user_id = message['from']['id']
-            user_name = message['from']['username']
-            first_name = message['from']['first_name']
-            keys = message.keys()
-            try:
-                if 'text' in keys:
-                    text = message['text']
-                    requests.get(f'{BASE_URL}{token}/sendMessage?chat_id={user_id}&text={text}')
-                elif 'photo' in keys:
-                    file_id = message['photo'][0]['file_id']
-                    if 'caption' in keys:
-                        caption = message['caption']
-                    else:
-                        caption = ''
-                    requests.get(f'{BASE_URL}{token}/sendPhoto?chat_id={user_id}&photo={file_id}&caption={caption}')
-                elif 'video' in keys:
-                    file_id = message['video']['file_id']
-                    if 'caption' in keys:
-                        caption = message['caption']
-                    else:
-                        caption = ''
-                    requests.get(f'{BASE_URL}{token}/sendVideo?chat_id={user_id}&video={file_id}&caption={caption}')
-                elif 'document' in keys:
-                    file_id = message['document']['file_id']
-                    if 'caption' in keys:
-                        caption = message['caption']
-                    else:
-                        caption = ''
-                    requests.get(f'{BASE_URL}{token}/sendDocument?chat_id={user_id}&document={file_id}&caption={caption}')
-                else:
-                    requests.get(f'{BASE_URL}{token}/sendMessage?chat_id={user_id}&text=Такого пока не умею')
-            except Exception:
-                print('Error')
-work()
+from aiogram import Bot, types
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
+from aiogram.dispatcher import Dispatcher
+from aiogram.dispatcher.webhook import SendMessage
+from aiogram.utils.executor import start_webhook
+
+API_TOKEN = 'BOT_TOKEN_HERE'
+
+# Настройка Webhook
+WEBHOOK_HOST = 'https://a120-95-25-161-16.ngrok-free.app' # -> Адрес сервера
+WEBHOOK_PATH = ''# -> Путь до api, где слушает бот
+WEBHOOK_URL = f'{WEBHOOK_HOST}{WEBHOOK_PATH}' # -> URL на который будут приниматься запросы
+
+# Настройка web-сервера
+WEBAPP_HOST = 'localhost' # -> хост нашего приложения, оставляем локальным
+WEBAPP_PORT = 8000 # -> port на котором работает наше приложение
+
+logging.basicConfig(level=logging.INFO)
+
+bot = Bot(token='6261025312:AAGVVr4uPV7YBZIQ33RqXGr87YtoDzfbBYc')
+dp = Dispatcher(bot)
+dp.middleware.setup(LoggingMiddleware())
+
+async def on_startup(dp):
+    await bot.set_webhook(WEBHOOK_URL)
+
+async def on_shutdown(dp):
+    logging.warning('Shutting down...')
+    await bot.delete_webhook()
+    logging.warning('Bye!')
+
+@dp.message_handler(commands=['start'])
+async def echo(msg: types.Message):
+    return SendMessage(msg.chat.id, msg.text)
+
+@dp.message_handler(commands=['help'])
+async def echo(msg: types.Message):
+    return SendMessage(msg.chat.id, 'Вы обратились к справке бота')
+
+if __name__ == "__main__":
+    start_webhook(
+        dispatcher=dp,
+        webhook_path=WEBHOOK_PATH,
+        on_startup=on_startup,
+        on_shutdown=on_shutdown,
+        skip_updates=True,
+        host=WEBAPP_HOST,
+        port=WEBAPP_PORT,
+    )
